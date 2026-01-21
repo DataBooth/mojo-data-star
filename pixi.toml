@@ -1,0 +1,33 @@
+[project]
+name = "mojo-data-star"
+version = "0.1.0"
+description = "Interactive Mandelbrot explorer with Mojo, FastHTML, Datastar, and pixi-managed environments."
+channels = ["conda-forge"]
+platforms = ["osx-64", "osx-arm64", "linux-64", "win-64"]
+
+[tasks]
+# Build the Mojo extension module as a shared library for Python
+build = "mojo build mandelbrot.mojo --emit shared-lib -o mandelbrot.so"
+
+# Run Mojo TestSuite tests
+test-mojo = "mojo run tests/test_mandelbrot.mojo"
+
+# Run Python tests
+test-py = "pytest"
+
+# Run all tests
+test = "pytest && mojo run tests/test_mandelbrot.mojo"
+
+# Serve the FastHTML app (FastHTML wraps Starlette/uvicorn under the hood)
+serve = "uvicorn main:app --reload --port 8000"
+
+[dependencies]
+python = "3.12.*"
+mojo = "*"
+uv = "*"
+pytest = "*"
+uvicorn = "*"
+httpx = "*"
+pillow = "*"
+"python-fasthtml" = "*"      # FastHTML framework
+"datastar-py" = "*"          # Datastar Python helpers (import name datastar_py)

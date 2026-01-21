@@ -1,0 +1,12 @@
+# General
+.DS_Store
+*.log
+
+# Python / Mojo tooling
+__pycache__/
+*.py[cod]
+*.mojoc
+
+# Environments
+.venv/
+.env
