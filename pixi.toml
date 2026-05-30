@@ -3,7 +3,7 @@ authors = ["Michael Booth <michael@databooth.com.au>"]
 channels = ["conda-forge", "https://conda.modular.com/max"]
 name = "mojo-data-star"
 platforms = ["osx-arm64", "linux-64"]
-version = "0.1.0"
+version = "0.9.1"
 
 description = "Interactive Mandelbrot explorer with Mojo, FastHTML, Datastar, and pixi-managed environments."
 
