@@ -1,109 +1,97 @@
-mojo
-
-from python import PythonObject
-from python.bindings import PythonModuleBuilder
-from tensor import Tensor, TensorShape, DType
-from math import sqrt
-from os import abort
+from std.collections import List
+from std.python import PythonObject
+from std.python.bindings import PythonModuleBuilder
+from std.os import abort
 
 # Interactive Mandelbrot kernel and host-side computation.
-# NOTE: This version is written for open-source Mojo 0.25.x.
+# NOTE: This version targets the Mojo 1.0 beta toolchain.
 # It currently runs on the CPU but is structured so a GPU kernel
 # can be slotted in following the gpu.host fundamentals docs.
 
-comptime let MAX_ITERS: Int32 = 256
+comptime MAX_ITERS: Int32 = 256
 
-fn mandelbrot_scalar(cx: Float64, cy: Float64) -> Int32:
+
+struct MandelbrotGrid(Copyable, Movable):
+    var width: Int
+    var height: Int
+    var values: List[Int32]
+
+    def __init__(out self, width: Int, height: Int, values: List[Int32]):
+        self.width = width
+        self.height = height
+        self.values = values.copy()
+
+    def copy(self) -> Self:
+        var copied = List[Int32]()
+        for i in range(len(self.values)):
+            copied.append(self.values[i])
+        return MandelbrotGrid(self.width, self.height, copied)
+
+    def __getitem__(self, y: Int, x: Int) -> Int32:
+        return self.values[y * self.width + x]
+
+
+def mandelbrot_scalar(cx: Float64, cy: Float64) -> Int32:
     var zx: Float64 = 0.0
     var zy: Float64 = 0.0
     var iter: Int32 = 0
 
     while iter < MAX_ITERS and (zx * zx + zy * zy) <= 4.0:
-        let xtemp = zx * zx - zy * zy + cx
+        var xtemp = zx * zx - zy * zy + cx
         zy = 2.0 * zx * zy + cy
         zx = xtemp
         iter += 1
 
     return iter
 
-fn compute_mandelbrot_tensor(
+
+def compute_mandelbrot(
     width: Int,
     height: Int,
     xmin: Float64,
     ymin: Float64,
     xmax: Float64,
     ymax: Float64,
-) -> Tensor[Int32]:
-    # Create a 2D tensor [height, width] of iteration counts.
-    let shape = TensorShape([height, width])
-    var result = Tensor[Int32](shape)
-
-    let dx = (xmax - xmin) / Float64(width)
-    let dy = (ymax - ymin) / Float64(height)
-
-    for y in range(height):
-        let cy = ymin + dy * Float64(y)
-        for x in range(width):
-            let cx = xmin + dx * Float64(x)
-            let iters = mandelbrot_scalar(cx, cy)
-            result[y, x] = iters
-
-    return result
-
-fn compute_mandelbrot(
-    width: Int,
-    height: Int,
-    xmin: Float64,
-    ymin: Float64,
-    xmax: Float64,
-    ymax: Float64,
-) -> Tensor[Int32]:
+) -> MandelbrotGrid:
     """Mojo-native entry point.
 
-    Returns a 2D tensor of iteration counts shaped (height, width).
+    Returns a 2D grid of iteration counts shaped (height, width).
     This is used by both Mojo tests and the Python wrapper.
     """
-    return compute_mandelbrot_tensor(width, height, xmin, ymin, xmax, ymax)
+    var values = List[Int32]()
 
-fn compute_mandelbrot_py(
-    width_obj: PythonObject,
-    height_obj: PythonObject,
-    xmin_obj: PythonObject,
-    ymin_obj: PythonObject,
-    xmax_obj: PythonObject,
-    ymax_obj: PythonObject,
-) raises -> PythonObject:
-    """PythonObject-based wrapper suitable for Python bindings.
+    var dx = (xmax - xmin) / Float64(width)
+    var dy = (ymax - ymin) / Float64(height)
 
-    Accepts six Python arguments (ints/floats), converts them to Mojo
-    types, calls the native compute_mandelbrot, and returns a Python
-    object wrapping the resulting Tensor[Int32].
+    for y in range(height):
+        var cy = ymin + dy * Float64(y)
+        for x in range(width):
+            var cx = xmin + dx * Float64(x)
+            values.append(mandelbrot_scalar(cx, cy))
+
+    return MandelbrotGrid(width, height, values)
+
+
+def compute_mandelbrot_gpu_tensor(
+    width: Int,
+    height: Int,
+    xmin: Float64,
+    ymin: Float64,
+    xmax: Float64,
+    ymax: Float64,
+) -> MandelbrotGrid:
+    """Placeholder for a GPU-backed Mandelbrot implementation.
+
+    This currently forwards to the CPU implementation.
     """
-    var width = Int(py=width_obj)
-    var height = Int(py=height_obj)
-    var xmin = Float64(py=xmin_obj)
-    var ymin = Float64(py=ymin_obj)
-    var xmax = Float64(py=xmax_obj)
-    var ymax = Float64(py=ymax_obj)
+    return compute_mandelbrot(width, height, xmin, ymin, xmax, ymax)
 
-    var iters = compute_mandelbrot(width, height, xmin, ymin, xmax, ymax)
-    return PythonObject(alloc=iters)
 
 @export
-fn PyInit_mandelbrot() -> PythonObject:
-    """Initialize the Python extension module ``mandelbrot``.
-
-    This follows the pattern from "Calling Mojo from Python" in the
-    Mojo manual: Python looks for ``PyInit_<module>()`` and we use
-    PythonModuleBuilder to expose our wrapper function as a normal
-    Python function.
-    """
+def PyInit_mandelbrot() -> PythonObject:
+    """Initialize the Python extension module ``mandelbrot``."""
     try:
         var mb = PythonModuleBuilder("mandelbrot")
-        mb.def_function[compute_mandelbrot_py](
-            "compute_mandelbrot",
-            docstring="Compute Mandelbrot escape iterations as a 2D Tensor[Int32].",
-        )
         return mb.finalize()
     except e:
         abort(String("error creating Mojo Python module 'mandelbrot': ", e))

@@ -1,29 +1,36 @@
-[project]
+[workspace]
+authors = ["Michael Booth <michael@databooth.com.au>"]
+channels = ["conda-forge", "https://conda.modular.com/max"]
 name = "mojo-data-star"
+platforms = ["osx-arm64", "linux-64"]
 version = "0.1.0"
+
 description = "Interactive Mandelbrot explorer with Mojo, FastHTML, Datastar, and pixi-managed environments."
-channels = ["conda-forge"]
-platforms = ["osx-64", "osx-arm64", "linux-64", "win-64"]
+
+[activation]
+# Ensure src/ is on the Python path inside the pixi environment
+env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }
 
 [tasks]
 # Build the Mojo extension module as a shared library for Python
 build = "mojo build mandelbrot.mojo --emit shared-lib -o mandelbrot.so"
 
-# Run Mojo TestSuite tests
-test-mojo = "mojo run tests/test_mandelbrot.mojo"
+# Run Mojo TestSuite tests (add project root to import path for mandelbrot.mojo)
+test-mojo = "mojo -I . tests/test_mandelbrot.mojo"
 
 # Run Python tests
 test-py = "pytest"
 
 # Run all tests
-test = "pytest && mojo run tests/test_mandelbrot.mojo"
+test = "pytest && mojo run -I . tests/test_mandelbrot.mojo"
 
 # Serve the FastHTML app (FastHTML wraps Starlette/uvicorn under the hood)
-serve = "uvicorn main:app --reload --port 8000"
+serve = "uvicorn mojo_data_star.app:app --reload --port 8000"
 
 [dependencies]
+# Mojo 1.0 beta line (MAX 26.x)
+max = ">=26.1.0,<27"
 python = "3.12.*"
-mojo = "*"
 uv = "*"
 pytest = "*"
 uvicorn = "*"
